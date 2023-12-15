@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Script need a rework
+
 # Check if script is run as root
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root. Exiting."
@@ -23,7 +25,7 @@ fi
 
 # Use netselect-apt to find the fastest mirrors
 echo "Finding fastest Debian mirrors in your region..."
-mirrors=$(netselect-apt -c US -t 5 -a amd64 -n stable | grep -oP '(?<=Writing sources.list using)\s+(http[^\s]+)')
+mirrors=$(netselect-apt -c US -t 5 -a amd64 -n bookworm | grep -oP '(?<=Writing sources.list using)\s+(http[^\s]+)')
 
 if [ -z "$mirrors" ]; then
     echo "Failed to find fast mirrors. Exiting."
