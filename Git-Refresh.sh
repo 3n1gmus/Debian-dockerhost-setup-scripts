@@ -7,3 +7,6 @@ rm -dfr ./Debian-dockerhost-setup-scripts
 
 # Clone from Source
 git clone https://github.com/3n1gmus/Debian-dockerhost-setup-scripts.git
+
+# Set Execution
+chmod +x ./Debian-dockerhost-setup-scripts/*.sh

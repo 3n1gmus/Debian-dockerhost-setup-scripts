@@ -23,7 +23,7 @@ fi
 
 # Use netselect-apt to find the fastest mirrors
 echo "Finding fastest Debian mirrors in your region..."
-mirrors=$(netselect-apt -c "$debian_version" -a "$(lsb_release -is)" -n 5 | grep -oP '(?<=Writing sources.list using)\s+(http[^\s]+)')
+mirrors=$(netselect-apt -c US -t 5 -a amd64 -n stable | grep -oP '(?<=Writing sources.list using)\s+(http[^\s]+)')
 
 if [ -z "$mirrors" ]; then
     echo "Failed to find fast mirrors. Exiting."
