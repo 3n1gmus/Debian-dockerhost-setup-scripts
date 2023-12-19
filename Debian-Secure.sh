@@ -6,6 +6,10 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+
+# Specify the desired SSH IP address
+specific_ip="your_desired_ip"
+
 # Update the system
 apt update
 apt upgrade -y
@@ -14,6 +18,7 @@ apt upgrade -y
 apt install -y fail2ban apparmor-utils iptables-persistent
 
 # Secure SSH configuration
+sed -i "/^ListenAddress/c\ListenAddress $specific_ip" /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 systemctl restart ssh
