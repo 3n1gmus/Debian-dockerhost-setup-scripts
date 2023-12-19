@@ -13,7 +13,7 @@ specific_ip="your_desired_ip"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
 # Update sshd_config to listen on the specific IP address
-sed -i "/^ListenAddress/c\ListenAddress $specific_ip" /etc/ssh/sshd_config
+sed -i "s/#ListenAddress 0.0.0.0/ListenAddress $specific_ip" /etc/ssh/sshd_config
 
 # Restart the SSH service to apply changes
 systemctl restart ssh

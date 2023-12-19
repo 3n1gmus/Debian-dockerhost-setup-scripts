@@ -18,7 +18,7 @@ apt upgrade -y
 apt install -y fail2ban apparmor-utils iptables-persistent
 
 # Secure SSH configuration
-sed -i "/^ListenAddress/c\ListenAddress $specific_ip" /etc/ssh/sshd_config
+sed -i "s/#ListenAddress 0.0.0.0/ListenAddress $specific_ip" /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 systemctl restart ssh
