@@ -8,7 +8,7 @@ fi
 
 
 # Specify the desired SSH IP address
-specific_ip="your_desired_ip"
+# specific_ip="your_desired_ip"
 
 # Update the system
 apt update
@@ -18,7 +18,7 @@ apt upgrade -y
 apt install -y fail2ban apparmor-utils iptables-persistent
 
 # Secure SSH configuration
-sed -i "s/#ListenAddress 0.0.0.0/ListenAddress $specific_ip" /etc/ssh/sshd_config
+# sed -i "s/#ListenAddress 0.0.0.0/ListenAddress $specific_ip" /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 systemctl restart ssh
@@ -45,10 +45,8 @@ systemctl enable fail2ban
 systemctl start fail2ban
 
 # Configure iptables rules for Docker
-iptables -A FORWARD -i docker0 -o eth0 -j ACCEPT
-iptables -A FORWARD -i eth0 -o docker0 -j ACCEPT
-
-# Save iptables rules
-iptables-save > /etc/iptables/rules.v4
+# iptables -A FORWARD -i docker0 -o eth0 -j ACCEPT
+# iptables -A FORWARD -i eth0 -o docker0 -j ACCEPT
+# iptables-save > /etc/iptables/rules.v4
 
 echo "Security script executed. Please review and customize further as needed."
