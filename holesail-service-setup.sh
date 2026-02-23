@@ -1,31 +1,30 @@
 #!/bin/bash
 
-# 1. Ask for configuration details
-echo "--- Holesail Service Setup (z32 Fix) ---"
-read -p "Enter Secret Key (Leave blank to auto-generate a valid one): " USER_KEY
+# 1. Nuke old service if it exists
+echo "Cleaning up old service..."
+sudo systemctl stop holesail.service 2>/dev/null
+sudo systemctl disable holesail.service 2>/dev/null
+sudo rm -f /etc/systemd/system/holesail.service
+sudo systemctl daemon-reload
 
-# 2. Generate key if blank using the z32 alphabet
-if [ -z "$USER_KEY" ]; then
-    # Z32 alphabet excludes: 0, 1, 8, 9, l, v, etc.
-    Z32_ALPHABET="ybndrfszgctmqpkhxwjicalsurotkpey"
-    HOLESAIL_KEY=$(LC_ALL=C tr -dc "$Z32_ALPHABET" < /dev/urandom | head -c 32)
-    echo "Generated Valid Key: $HOLESAIL_KEY"
-else
-    HOLESAIL_KEY=$USER_KEY
-fi
+# 2. Setup New Service
+echo "--- Holesail Secure SSH Setup ---"
 
-read -p "Enter SSH Port (default is 22): " SSH_PORT
+# EXACT z32 alphabet: ybndrfszgctmqpkhxwjicalsurotkpey
+# Removed: l, v, 0, 1, 8, 9
+Z32_ALPHABET="ybndrfszgctmqpkhxwjicalsurotkpey"
+HOLESAIL_KEY=$(LC_ALL=C tr -dc "$Z32_ALPHABET" < /dev/urandom | head -c 32)
+
+read -p "Enter SSH Port (default 22): " SSH_PORT
 SSH_PORT=${SSH_PORT:-22}
 
-# 3. Create/Overwrite the service file
-SERVICE_FILE="/etc/systemd/system/holesail.service"
-sudo bash -c "cat > $SERVICE_FILE" <<EOF
+# 3. Create service file
+sudo bash -c "cat > /etc/systemd/system/holesail.service" <<EOF
 [Unit]
-Description=Holesail SSH Tunnel Server
+Description=Holesail SSH Tunnel
 After=network.target
 
 [Service]
-Type=simple
 ExecStart=/usr/local/bin/holesail --live $SSH_PORT --key $HOLESAIL_KEY
 Restart=always
 RestartSec=10
@@ -35,13 +34,13 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# 4. Activate
+# 4. Start
 sudo systemctl daemon-reload
 sudo systemctl enable holesail.service
-sudo systemctl restart holesail.service
+sudo systemctl start holesail.service
 
 echo "-----------------------------------------------"
-echo "Holesail is now running with a valid z32 key."
-echo "Your New Key: $HOLESAIL_KEY"
-echo "To connect: holesail $HOLESAIL_KEY --port 2222"
+echo "SUCCESS: Holesail is running."
+echo "YOUR VALID KEY: $HOLESAIL_KEY"
 echo "-----------------------------------------------"
+echo "Connect with: holesail $HOLESAIL_KEY --port 2222"
