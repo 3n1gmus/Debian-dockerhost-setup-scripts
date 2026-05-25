@@ -1,39 +1,59 @@
 #!/bin/bash
 
-# Update package lists
-apt update
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-# Install required packages
-apt install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg-agent \
-    software-properties-common \
-    cifs-utils \
-    nfs-common
+echo "=== Starting Docker Installation with Custom Logging ==="
 
-# Add Docker GPG key
-curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# 1. Update package lists
+apt-get update
 
-# Add Docker repository
-echo "deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+# 2. Create required directories (including Docker's config directory)
+mkdir -p /etc/apt/keyrings
+mkdir -p /etc/docker
 
-# Update package lists again
-apt update
+# 3. Write log rotation settings to /etc/docker/daemon.json
+cat <<EOF > /etc/docker/daemon.json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOF
+echo "--> Configured log rotation in /etc/docker/daemon.json"
 
-# Install Docker engine
-apt install -y docker-ce docker-ce-cli containerd.io
+# 4. Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-# Add the current user to the docker group (to run Docker commands without sudo)
-usermod -aG docker $USER
+# 5. Set up the stable repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+# 6. Update package lists with the new repository
+apt-get update
 
-# Display Docker and Docker Compose versions
+# 7. Install ALL prerequisites and Docker packages in a single line
+apt-get install -y apt-transport-https ca-certificates curl gnupg software-properties-common cifs-utils nfs-common lsb-release docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 8. Add the current user to the docker group
+if [ "$USER" != "root" ]; then
+    usermod -aG docker "$USER"
+    echo "--> Added user '$USER' to the docker group."
+else
+    echo "--> Running as root; skipping docker group assignment."
+fi
+
+echo "=== Installation Complete ==="
+echo "Docker Version:"
 docker --version
-docker-compose --version
+echo "Docker Compose Version:"
+docker compose version
 
-echo "Docker setup completed. You may need to log out and log back in to apply group changes."
+echo "--------------------------------------------------------"
+echo "NOTE: To apply docker group permissions without logging out,"
+echo "run the following command in your terminal:"
+echo "    newgrp docker"
+echo "--------------------------------------------------------"
