@@ -7,7 +7,6 @@ set -e
 if [ "$EUID" -ne 0 ]; then
     echo "Error: Please run this script as root or with sudo."
     exit 1
-
 fi
 
 echo "=== Starting Docker Installation with Custom Logging (DEB822) ==="
@@ -33,11 +32,15 @@ cat <<EOF > /etc/docker/daemon.json
 EOF
 echo "--> Configured log rotation in /etc/docker/daemon.json"
 
-# 4. Fetch the GPG key and format the repository into DEB822 format
-# This sources /etc/os-release to dynamically grab the correct Debian version name
+# 4. Fetch the GPG key and safely format the repository into DEB822 format
 . /etc/os-release
 
 echo "--> Configuring Docker DEB822 repository..."
+
+# Fetch the armored key and strip its headers/newlines so it's a single clean block
+DOCKER_KEY=$(curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor | base64 | tr -d '\n')
+
+# Construct the file, ensuring the multiline Signed-By block has the mandatory leading spaces
 cat <<EOF > /etc/apt/sources.list.d/docker.sources
 Types: deb
 URIs: https://download.docker.com/linux/debian
@@ -45,7 +48,7 @@ Suites: ${VERSION_CODENAME}
 Components: stable
 Architectures: $(dpkg --print-architecture)
 Signed-By:
- $(curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor | base64 | tr -d '\n')
+ ${DOCKER_KEY}
 EOF
 
 # 5. Update package lists with the new DEB822 repository
