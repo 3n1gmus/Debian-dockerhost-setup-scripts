@@ -17,6 +17,7 @@ apt-get update
 apt-get install -y curl gnupg
 
 # 2. Create required directories (including Docker's config directory)
+mkdir -p /etc/apt/keyrings
 mkdir -p /etc/apt/sources.list.d
 mkdir -p /etc/docker
 
@@ -32,30 +33,28 @@ cat <<EOF > /etc/docker/daemon.json
 EOF
 echo "--> Configured log rotation in /etc/docker/daemon.json"
 
-# 4. Fetch the GPG key and safely format the repository into DEB822 format
+# 4. Fetch Docker's GPG key and export it to an ASCII armored file
+echo "--> Saving Docker GPG key to /etc/apt/keyrings/docker.asc..."
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --yes --dearmor --armor -o /etc/apt/keyrings/docker.asc
+
+# 5. Set up the stable repository in DEB822 format pointing to the file key
 . /etc/os-release
 
 echo "--> Configuring Docker DEB822 repository..."
-
-# Fetch the armored key and strip its headers/newlines so it's a single clean block
-DOCKER_KEY=$(curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor | base64 | tr -d '\n')
-
-# Construct the file, ensuring the multiline Signed-By block has the mandatory leading spaces
 cat <<EOF > /etc/apt/sources.list.d/docker.sources
 Types: deb
 URIs: https://download.docker.com/linux/debian
 Suites: ${VERSION_CODENAME}
 Components: stable
 Architectures: $(dpkg --print-architecture)
-Signed-By:
- ${DOCKER_KEY}
+Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
-# 5. Update package lists with the new DEB822 repository
+# 6. Update package lists with the new DEB822 repository
 echo "--> Updating package lists with Docker repository..."
 apt-get update
 
-# 6. Install ALL prerequisites and Docker packages
+# 7. Install ALL prerequisites and Docker packages
 echo "--> Installing Docker and storage utilities..."
 apt-get install -y \
   apt-transport-https \
@@ -68,7 +67,7 @@ apt-get install -y \
   docker-buildx-plugin \
   docker-compose-plugin
 
-# 7. Add the non-root user who called sudo to the docker group
+# 8. Add the non-root user who called sudo to the docker group
 if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     usermod -aG docker "$SUDO_USER"
     echo "--> Added user '$SUDO_USER' to the docker group."
