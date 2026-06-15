@@ -1,52 +1,87 @@
 #!/bin/bash
 
-# Check if script is run as root
+# Ensure script is run as root
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root. Exiting."
+   echo "This script must be run as root. Exiting." >&2
    exit 1
 fi
 
+echo "Starting system hardening..."
 
-# Specify the desired SSH IP address
-# specific_ip="your_desired_ip"
+# 1. Non-interactive frontend for automated apt commands
+export DEBIAN_FRONTEND=noninteractive
 
-# Update the system
-apt update
-apt upgrade -y
+# 2. Update and Upgrade System
+apt-get update
+apt-get dist-upgrade -y
 
-# Install necessary packages
-apt install -y fail2ban apparmor-utils iptables-persistent
+# 3. Install Security Packages
+apt-get install -y fail2ban apparmor-utils ufw libpam-pwquality unattended-upgrades
 
-# Secure SSH configuration
-# sed -i "s/#ListenAddress 0.0.0.0/ListenAddress $specific_ip" /etc/ssh/sshd_config
-sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
-systemctl restart ssh
+# 4. Secure SSH Configuration (Using modern drop-in files)
+echo "Configuring SSH security..."
+cat <<EOF > /etc/ssh/sshd_config.d/99-hardening.conf
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+X11Forwarding no
+MaxAuthTries 3
+EOF
 
-# Set strong password policies
-apt install -y libpam-pwquality
-sed -i '/pam_pwquality.so/s/$/ retry=3/' /etc/security/pwquality.conf
-sed -i '/pam_pwquality.so/s/$/ minlen=12/' /etc/security/pwquality.conf
-sed -i '/pam_pwquality.so/s/$/ ucredit=-1/' /etc/security/pwquality.conf
-sed -i '/pam_pwquality.so/s/$/ dcredit=-1/' /etc/security/pwquality.conf
-sed -i '/pam_pwquality.so/s/$/ ocredit=-1/' /etc/security/pwquality.conf
-sed -i '/pam_pwquality.so/s/$/ lcredit=-1/' /etc/security/pwquality.conf
+# Restart SSH to apply changes safely
+if sshd -t; then
+    systemctl restart ssh
+else
+    echo "Warning: SSH configuration test failed. Not restarting SSH." >&2
+fi
 
-# Configure automatic security updates
-apt install -y unattended-upgrades
-echo 'APT::Periodic::Update-Package-Lists "1";' | tee -a /etc/apt/apt.conf.d/20auto-upgrades
-echo 'APT::Periodic::Download-Upgradeable-Packages "1";' | tee -a /etc/apt/apt.conf.d/20auto-upgrades
-echo 'APT::Periodic::AutocleanInterval "7";' | tee -a /etc/apt/apt.conf.d/20auto-upgrades
-echo 'APT::Periodic::Unattended-Upgrade "1";' | tee -a /etc/apt/apt.conf.d/20auto-upgrades
+# 5. Set Strong Password Policies
+echo "Configuring password quality requirements..."
+cat <<EOF > /etc/security/pwquality.conf
+# Set password complexity requirements
+minlen = 12
+retry = 3
+ucredit = -1
+dcredit = -1
+ocredit = -1
+lcredit = -1
+EOF
+
+# 6. Configure Automatic Security Updates
+echo "Configuring unattended-upgrades..."
+cat <<EOF > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+
 systemctl restart unattended-upgrades
 
-# Configure fail2ban
-systemctl enable fail2ban
-systemctl start fail2ban
+# 7. Configure Firewall (UFW) & Fail2ban
+echo "Configuring Firewall and Fail2ban..."
 
-# Configure iptables rules for Docker
-# iptables -A FORWARD -i docker0 -o eth0 -j ACCEPT
-# iptables -A FORWARD -i eth0 -o docker0 -j ACCEPT
-# iptables-save > /etc/iptables/rules.v4
+# Setup local jail for Fail2ban
+cat <<EOF > /etc/fail2ban/jail.local
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = %(sshd_log)s
+maxretry = 3
+bantime = 1h
+EOF
 
-echo "Security script executed. Please review and customize further as needed."
+systemctl enable --now fail2ban
+
+# Setup UFW (Safely allow SSH before enabling)
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow ssh
+ufw --force enable
+
+echo "--------------------------------------------------------"
+echo "Security script executed successfully."
+echo "CRITICAL: Do not close this terminal session until you"
+echo "test logging in via a NEW terminal to verify SSH works!"
+echo "--------------------------------------------------------"
